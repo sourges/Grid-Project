@@ -129,7 +129,7 @@ get_order_info()
 
 
 
-#open orders yet to fill
+# open orders yet to fill
 def get_order_list():
 	url = 'https://api.kucoin.com/api/v1/orders?status=active'
 	# str_to_sign = str(now) + 'GET' + '/api/v1/orders?status=active'
@@ -140,7 +140,7 @@ def get_order_list():
 
 #get_order_list()
 
-#working
+# working
 
 #asks, bids = get_single_ticker()
 #print(asks, bids)
