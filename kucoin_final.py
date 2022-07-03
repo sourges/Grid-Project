@@ -2,6 +2,8 @@ import json
 import requests
 import time
 import hashlib
+
+# need to change all this to config
 from config import *
 import hmac
 import base64
