@@ -10,10 +10,10 @@ import sys
 
 
 ######### in call_code need to figure out 'GET', 'POST', as well as signing #############
-######### test *data_json variable call between both functions, then figure out global variable calls
+######### test *data_json variable call between both functions, then figure out global variable calls ##########
 
 
-
+###### eventually will need to create a class #############
 
 def call_code(data_json=None, order_id=None):
 	if data_json == None:
