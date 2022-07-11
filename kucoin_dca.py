@@ -5,8 +5,9 @@
 # - place orders for each dca 
 # - clean up alot of the comments
 # - clean up unused / unnessary code
-# - move variables into config?
+# - move variables into config? - (not user interacted variables)
 # - test if you can limit buy from 'funds' (quote currency) instead of 'size' (base currency)
+# - get available balance - take out funds variable
 
 
 from config import *
@@ -16,10 +17,6 @@ import time
 import hashlib
 import hmac
 import base64
-
-
-
-
 
 
 # these will eventually be manually entered by the user
@@ -47,6 +44,7 @@ dca_orders = [] # will need to put all order prices in here to average out to ge
 
 
 # initial buy - eventually from webhook
+# start thinking about moving the base order out of dca_bot
 
 def dca_bot(initial_safety_buy_amount):
 
