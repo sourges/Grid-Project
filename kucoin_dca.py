@@ -1,12 +1,12 @@
 # testing code for DCA bot
 
-# to do list for 7/12
-# - set up 1st TP for initial order
-# - place orders for each dca 
-# - clean up alot of the comments
-# - clean up unused / unnessary code
-# - move variables into config?
-# - test if you can limit buy from 'funds' (quote currency) instead of 'size' (base currency)
+# to do list for 7/13
+# - place orders for each dca - currently variables are ready, just need to put the order together
+# - call_code() need a change, probably use call_code(str_to_sign ,data_json=None, order_id=None) for now even tho it looks horrible
+# - if call_code() update works, then update the grid bot code as well
+# - start thinking of a function that will find out - priceIncrement + baseMinSize for base order - for limit at least - see what difference market does - symbol_list has this, see if you can
+#   just call one at a time
+# - priceIncrement + baseMinSize would be used to round() everything
 
 
 from config import *
@@ -26,7 +26,7 @@ price_deviation_percent = .01 # 1% - normally run .005 or .5%
 
 saftey_order_volume_scale = 2 # multiples orders by - in this case - * 2
 
-funds = 43.51904823  # will need to retreive actual available balance
+funds = 43.50653  # will need to retreive actual available balance
 
 
 # testing these right now
@@ -44,12 +44,9 @@ dca_orders = [] # will need to put all order prices in here to average out to ge
 
 # initial buy - eventually from webhook
 
-#def dca_bot(initial_safety_buy_amount, take_profit_percent):
 def dca_bot(initial_safety_buy_amount):
 	order_Id = place_market_order(round(initial_order_buy_amount,6))  # can move this round somewhere else - main issue is its different for each base - market only quoteIncrement
 
-
-	# time.sleep(5) - do i need at this point with the other sleep
 	order_id = order_Id['orderId']
 	
 	initial_price, initial_fee, order_quantity = test_fills(order_id)  # returns from market price
@@ -58,51 +55,47 @@ def dca_bot(initial_safety_buy_amount):
 	# test purposes, will delete later
 	print(f"price inside of dca_bot - {initial_price}")
 	print(f"market buy fee - {initial_fee}")
+	print(f"order quantity - {order_quantity}")
 
 	tp_price_with_fee = ((initial_price + initial_fee) * take_profit_percent) + initial_price
-	# tp_price_without_fee = (initial_price * take_profit_percent) + initial_price # does not include market fee for this calculation
 
 	# print for testing purposes
 	print(f"tp_price_with_fee - {tp_price_with_fee}")
 
 	# need to figure out if i want TP to be in an array and if a SO gets excituted, add fee, calculate new tp, etc
-	# tp currently working
 	place_limit_order(tp_price_with_fee, order_quantity, "SELL" )
-	#position_size = 
-	#place_limit_order(tp_price_with_fee, position_size, "SELL")
 
 
 	# ****** currently testing ************
 
 
 	for i in range(max_safety_orders):
-	 	deviation = price_deviation_percent + last_deviation
-	 	deviation = round(deviation, 2)
-	 	deviated_price = initial_price - (initial_price * deviation)
-	 	deviated_price = round(deviated_price, 7)  # will be limit price
+		deviation = price_deviation_percent + last_deviation
+		deviation = round(deviation, 2)
+		deviated_price = initial_price - (initial_price * deviation)
+		deviated_price = round(deviated_price, 7)  # will be limit price
 
-	  	
-	  	# is there 'funds' call (amount of quote currency - usdt) for limit orders instead of 'size' (base currency)
 		# place_limit_order(deviated_price, position_size, "BUY")
 
-
 		# this print is where limit buys go
-	 	print(f"order # {i+1}")
-	 	print(deviation, deviated_price, round(initial_safety_buy_amount,7))
+		base_limit_order = initial_safety_buy_amount / deviated_price # - limit needs a base order to buy (Eth in this case)
+		print(f"order # {i+1}")
+		print(deviation, deviated_price, round(initial_safety_buy_amount,7), base_limit_order)
 
-	 	initial_safety_buy_amount *= saftey_order_volume_scale 
-	 	initial_safety_buy_amount = round(initial_safety_buy_amount, 7)
+		initial_safety_buy_amount *= saftey_order_volume_scale 
+		initial_safety_buy_amount = round(initial_safety_buy_amount, 7)
 
-	 	last_deviation = deviation * safety_order_step_scale
+		last_deviation = deviation * safety_order_step_scale
 
 
+# redo all of this
 
 def call_code(data_json=None, order_id=None):
 	if data_json == None:
 		now = int(time.time() * 1000)
 		#str_to_sign = str(now) + 'GET' + '/api/v1/orders?status=active'
-
-		str_to_sign = str(now) + 'GET' + '/api/v1/fills?orderId=' + order_id
+		str_to_sign = str(now) + 'GET' + '/api/v1/accounts'
+		#str_to_sign = str(now) + 'GET' + '/api/v1/fills?orderId=' + order_id
 		#str_to_sign = str(now) + 'GET' + '/api/v1/symbols'
 		#str_to_sign = str(now) + 'GET' + '/api/v1/orders/' + order_id
 
@@ -190,8 +183,6 @@ def place_limit_order(price, position_size, side):
 	print(response.json())
 	return response.json()
 
-#place_limit_order(1055, 10, "BUY")
-
 	
 def place_market_order(initial_order_buy_amount):
 
@@ -220,15 +211,23 @@ def place_market_order(initial_order_buy_amount):
 	return test # order id
 
 
+def account_info():
+	HEADERS = call_code()
+	url = 'https://api.kucoin.com/api/v1/accounts'
+	response = requests.get(url, headers = HEADERS)
+	print(response.status_code)
+	funds = []
+	#prints available balance
+	for i in range(len(response.json()['data'])):
+		if response.json()['data'][i]['currency'] == 'USDT':
+			return response.json()['data'][i]['available'] # return USDT for now
+		# if response.json()['data'][i]['balance'] > "0":  # these three line will print all balances > 0
+			# print(response.json()['data'][i])  
+			# funds.append(response.json()['data'][i])
+	
 
-dca_bot(initial_safety_buy_amount)  # - main for now
 
+funds = account_info() # USDT
+print(funds)
+#dca_bot(initial_safety_buy_amount)  # - main for now
 
-# test = get_fills('62cae739ff85ad0001f277d2')
-# print("test in main")
-# print(test)
-
-
-# test = get_order_info(order_id = "62cadeb6399d7a000119ea9c")
-# print("test in main")
-# print(test)
