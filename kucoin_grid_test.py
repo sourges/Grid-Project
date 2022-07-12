@@ -7,7 +7,7 @@ import hmac
 import base64
 import sys
 
-
+# - need to save trades to a file in order to view if trades are accurate.  also an error file
 
 ######### in call_code need to figure out 'GET', 'POST', as well as signing #############
 ######### test *data_json variable call between both functions, then figure out global variable calls ##########
