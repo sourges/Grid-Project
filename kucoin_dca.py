@@ -5,9 +5,8 @@
 # - place orders for each dca 
 # - clean up alot of the comments
 # - clean up unused / unnessary code
-# - move variables into config? - (not user interacted variables)
+# - move variables into config?
 # - test if you can limit buy from 'funds' (quote currency) instead of 'size' (base currency)
-# - get available balance - take out funds variable
 
 
 from config import *
@@ -27,7 +26,7 @@ price_deviation_percent = .01 # 1% - normally run .005 or .5%
 
 saftey_order_volume_scale = 2 # multiples orders by - in this case - * 2
 
-funds = 30.64692739  # will need to retreive actual available balance
+funds = 43.51904823  # will need to retreive actual available balance
 
 
 # testing these right now
@@ -35,31 +34,42 @@ funds = 30.64692739  # will need to retreive actual available balance
 base_order_percent =  .01 # 1%
 saftey_order_percent = .01 # 1%
 
-initial_order_buy_amount = funds * base_order_percent # need a different name that is easier to understand
+initial_order_buy_amount = funds * base_order_percent # only called once through market order
 initial_safety_buy_amount = funds * saftey_order_percent
 
 # not used yet
-take_profit_percent = .3 # .3 % or .003
+take_profit_percent = .003 # .3% - for now low for scalping / testing
 dca_orders = [] # will need to put all order prices in here to average out to get the % TP
 
 
 # initial buy - eventually from webhook
-# start thinking about moving the base order out of dca_bot
 
+#def dca_bot(initial_safety_buy_amount, take_profit_percent):
 def dca_bot(initial_safety_buy_amount):
-
 	order_Id = place_market_order(round(initial_order_buy_amount,6))  # can move this round somewhere else - main issue is its different for each base - market only quoteIncrement
 
 
 	# time.sleep(5) - do i need at this point with the other sleep
 	order_id = order_Id['orderId']
 	
-	initial_price, initial_fee = test_fills(order_id)  # returns market price
+	initial_price, initial_fee, order_quantity = test_fills(order_id)  # returns from market price
 	last_deviation = 0
 
 	# test purposes, will delete later
 	print(f"price inside of dca_bot - {initial_price}")
 	print(f"market buy fee - {initial_fee}")
+
+	tp_price_with_fee = ((initial_price + initial_fee) * take_profit_percent) + initial_price
+	# tp_price_without_fee = (initial_price * take_profit_percent) + initial_price # does not include market fee for this calculation
+
+	# print for testing purposes
+	print(f"tp_price_with_fee - {tp_price_with_fee}")
+
+	# need to figure out if i want TP to be in an array and if a SO gets excituted, add fee, calculate new tp, etc
+	# tp currently working
+	place_limit_order(tp_price_with_fee, order_quantity, "SELL" )
+	#position_size = 
+	#place_limit_order(tp_price_with_fee, position_size, "SELL")
 
 
 	# ****** currently testing ************
@@ -78,7 +88,7 @@ def dca_bot(initial_safety_buy_amount):
 
 		# this print is where limit buys go
 	 	print(f"order # {i+1}")
-	 	print(deviation, deviated_price, initial_safety_buy_amount)
+	 	print(deviation, deviated_price, round(initial_safety_buy_amount,7))
 
 	 	initial_safety_buy_amount *= saftey_order_volume_scale 
 	 	initial_safety_buy_amount = round(initial_safety_buy_amount, 7)
@@ -150,9 +160,10 @@ def test_fills(order_id):
 	# print(response.json())
 	price = response.json()['data']['items'][0]['price']
 	initial_fee = response.json()['data']['items'][0]['fee']
+	order_quantity = response.json()['data']['items'][0]['size']
 	# print(price)
 	# print("********************************")
-	return float(price), float(initial_fee)
+	return float(price), float(initial_fee), float(order_quantity)
 	
 
 #test_fills(order_id)
@@ -169,8 +180,8 @@ def place_limit_order(price, position_size, side):
 		"side":side,
 		"symbol":"ETH-USDT",  # to be user entered
 		"type":"LIMIT",
-		"price": round(price, 4),
-		"size":position_size
+		"price": round(price, 2),   # eth is price increment of 2 decimal places
+		"size":round(position_size,4)   # baseMinSize for ETH - 0.0001
 	}
 	data_json = json.dumps(data)
 	HEADERS = call_code(data_json)
@@ -178,6 +189,8 @@ def place_limit_order(price, position_size, side):
 	print(response.status_code)
 	print(response.json())
 	return response.json()
+
+#place_limit_order(1055, 10, "BUY")
 
 	
 def place_market_order(initial_order_buy_amount):
@@ -208,7 +221,7 @@ def place_market_order(initial_order_buy_amount):
 
 
 
-dca_bot(initial_safety_buy_amount)
+dca_bot(initial_safety_buy_amount)  # - main for now
 
 
 # test = get_fills('62cae739ff85ad0001f277d2')
