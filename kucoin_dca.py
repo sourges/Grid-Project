@@ -1,9 +1,7 @@
 # testing code for DCA bot
 
-# to do list for 7/13
-# - place orders for each dca - currently variables are ready, just need to put the order together - done
-# - call_code() need a change, probably use call_code(str_to_sign , data_json=None, order_id=None) for now even tho it looks horrible
-# - if call_code() update works, then update the grid bot code as well
+# - to do list for 7/14
+# - work on main loop for TP
 # - start thinking of a function that will find out - priceIncrement + baseMinSize for base order - for limit at least - see what difference market does - symbol_list has this, see if you can
 #   just call one at a time
 # - priceIncrement + baseMinSize would be used to round() everything
@@ -67,7 +65,8 @@ def dca_bot(initial_safety_buy_amount):
 
 	# need to figure out if i want TP to be in an array and if a SO gets excituted, add fee, calculate new tp, etc
 	take_profit_order = place_limit_order(tp_price_with_fee, order_quantity, "SELL" )
-	tp_orders.append(take_profit_order['data'])
+
+	tp_orders.append(take_profit_order) # should have to ['data'] but on next buy test look at print
 
 
 	# ****** currently testing ************
@@ -96,25 +95,13 @@ def dca_bot(initial_safety_buy_amount):
 
 		last_deviation = deviation * safety_order_step_scale
 
-	return dca_orders, tp_orders # dca orders which have order ids
+	return dca_orders, tp_orders # dca orders which have order ids in an array, tp_orders only has one in an array
 
-# redo all of this
 
-def call_code(data_json=None, order_id=None):
-	if data_json == None:
-		now = int(time.time() * 1000)
-		#str_to_sign = str(now) + 'GET' + '/api/v1/orders?status=active'
-		#str_to_sign = str(now) + 'GET' + '/api/v1/accounts'
-		str_to_sign = str(now) + 'GET' + '/api/v1/fills?orderId=' + order_id
-		#str_to_sign = str(now) + 'GET' + '/api/v1/symbols'
-		#str_to_sign = str(now) + 'GET' + '/api/v1/orders/' + order_id
-
-	else:
-		now = int(time.time() * 1000)
-		str_to_sign = str(now) + 'POST' + '/api/v1/orders' + data_json
-		
-		print(str_to_sign)
-
+def call_code(str_to_sign ,data_json=None, order_id=None):
+	#print(data_json)
+	#print(str_to_sign)
+	now = int(time.time() * 1000)
 	signature = base64.b64encode(
 		hmac.new(api_secret.encode('utf-8'), str_to_sign.encode('utf-8'), hashlib.sha256).digest())
 	passphrase = base64.b64encode(hmac.new(api_secret.encode('utf-8'), api_passphrase.encode('utf-8'), hashlib.sha256).digest())
@@ -129,50 +116,49 @@ def call_code(data_json=None, order_id=None):
 	return HEADERS
 
 
-# *************** test this to see if it works compared to test_fills() **********************
 
+# once TP is hit, all SO need to be cancelled
+# will not use cancel all from api due to other trades in progress
 
-# def get_order_info(order_id):
-# 	url = 'https://api.kucoin.com/api/v1/orders/' + order_id
-# 	# str_to_sign = str(now) + 'GET' + '/api/v1/orders/62c19f43fc3df20001f6214c'
-# 	data_json = None
-# 	HEADERS = call_code(data_json, order_id)
-# 	response = requests.get(url, headers = HEADERS)
-	
-# 	print("printing inside get_order_info")
-# 	print(response.status_code)
-# 	print(response.json())
-
-# 	return response.json()
+def cancel_orders():
+	# since orders will be in an array, will make a 'for' loop to cycle through oderID and delete
+	url = 'https://api.kucoin.com/api/v1/orders/' + order_id
+	now = int(time.time() * 1000)
+	str_to_sign = str(now) + 'DELETE' + '/api/v1/orders/' + order_id
 
 
 
+# used to get order info - LIMIT ONLY - working
+def get_order_info(order_id):
+	url = 'https://api.kucoin.com/api/v1/orders/' + order_id
+	now = int(time.time() * 1000)
+	str_to_sign = str(now) + 'GET' + '/api/v1/orders/' + order_id
+	data_json = None
+	HEADERS = call_code(str_to_sign ,data_json, order_id)
+	response = requests.get(url, headers = HEADERS)
+	print(response.status_code)
+	print(response.json())
+	return response.json()
 
-# use this to find out market order price
 
-
+# used to get order info - MARKET ONLY - working
 def test_fills(order_id):
 	url = 'https://api.kucoin.com/api/v1/fills?orderId=' + order_id
-	print(url)
 	data_json = None
-	HEADERS = call_code(data_json, order_id)
+	now = int(time.time() * 1000)
+	str_to_sign = str(now) + 'GET' + '/api/v1/fills?orderId=' + order_id
+	HEADERS = call_code(str_to_sign ,data_json, order_id)
 	response = requests.get(url, headers = HEADERS)
 	
 	# for test purposes
 
-	# print(response.json())
+	#print(response.json())
 	price = response.json()['data']['items'][0]['price']
 	initial_fee = response.json()['data']['items'][0]['fee']
 	order_quantity = response.json()['data']['items'][0]['size']
-	# print(price)
-	# print("********************************")
 	return float(price), float(initial_fee), float(order_quantity)
-	
 
-#test_fills(order_id)
-
-
-
+# - working
 def place_limit_order(price, position_size, side):
 	# is position_size needed for an arguement if its coming from config
 
@@ -187,13 +173,14 @@ def place_limit_order(price, position_size, side):
 		"size":round(position_size,7)   # baseMinSize for ETH - 0.0001  baseIncrement - .0000001     7 deciaml places for eth-usdt
 	}
 	data_json = json.dumps(data)
-	HEADERS = call_code(data_json)
+	str_to_sign = str(now) + 'POST' + '/api/v1/orders' + data_json
+	HEADERS = call_code(str_to_sign, data_json)
 	response = requests.post(url, headers = HEADERS, data = data_json)
-	print(response.status_code)
-	print(response.json())
-	return response.json() # will have to do response.json()['data'] later, for now watch that the orders are correct
+	return response.json()['data']
 
-	
+
+
+# - working
 def place_market_order(initial_order_buy_amount):
 
 	url = 'https://api.kucoin.com/api/v1/orders'
@@ -207,9 +194,9 @@ def place_market_order(initial_order_buy_amount):
 	}
 
 	data_json = json.dumps(data)
-	HEADERS = call_code(data_json)
+	str_to_sign = str(now) + 'POST' + '/api/v1/orders' + data_json
+	HEADERS = call_code(str_to_sign, data_json)
 	response = requests.post(url, headers = HEADERS, data = data_json)
-	print(response.status_code)
 	
 	# test to see if sleep can be dropped to 4
 	time.sleep(5)
@@ -221,8 +208,11 @@ def place_market_order(initial_order_buy_amount):
 	return test # order id
 
 
+# - working
 def account_info():
-	HEADERS = call_code()
+	now = int(time.time() * 1000)
+	str_to_sign = str(now) + 'GET' + '/api/v1/accounts'
+	HEADERS = call_code(str_to_sign)
 	url = 'https://api.kucoin.com/api/v1/accounts'
 	response = requests.get(url, headers = HEADERS)
 	print(response.status_code)
@@ -239,6 +229,15 @@ def account_info():
 
 #funds = account_info() # USDT
 #print(funds)
+
+
 dca_orders, tp_orders = dca_bot(initial_safety_buy_amount)  # - main for now
 
+
+print(f"testing - dca_orders {dca_orders}")
+print(f"testing - tp_orders {tp_orders}")
+
+
 # main loop here
+
+while True:
