@@ -1,8 +1,8 @@
 # testing code for DCA bot
 
 # to do list for 7/13
-# - place orders for each dca - currently variables are ready, just need to put the order together
-# - call_code() need a change, probably use call_code(str_to_sign ,data_json=None, order_id=None) for now even tho it looks horrible
+# - place orders for each dca - currently variables are ready, just need to put the order together - done
+# - call_code() need a change, probably use call_code(str_to_sign , data_json=None, order_id=None) for now even tho it looks horrible
 # - if call_code() update works, then update the grid bot code as well
 # - start thinking of a function that will find out - priceIncrement + baseMinSize for base order - for limit at least - see what difference market does - symbol_list has this, see if you can
 #   just call one at a time
@@ -40,11 +40,14 @@ initial_safety_buy_amount = funds * saftey_order_percent
 # not used yet
 take_profit_percent = .003 # .3% - for now low for scalping / testing
 dca_orders = [] # will need to put all order prices in here to average out to get the % TP
+tp_orders = []
 
 
 # initial buy - eventually from webhook
 
 def dca_bot(initial_safety_buy_amount):
+
+	# might also need a try / except to make sure the order is actually placed before any dca or tp are placed
 	order_Id = place_market_order(round(initial_order_buy_amount,6))  # can move this round somewhere else - main issue is its different for each base - market only quoteIncrement
 
 	order_id = order_Id['orderId']
@@ -64,6 +67,7 @@ def dca_bot(initial_safety_buy_amount):
 
 	# need to figure out if i want TP to be in an array and if a SO gets excituted, add fee, calculate new tp, etc
 	take_profit_order = place_limit_order(tp_price_with_fee, order_quantity, "SELL" )
+	tp_orders.append(take_profit_order['data'])
 
 
 	# ****** currently testing ************
@@ -92,6 +96,7 @@ def dca_bot(initial_safety_buy_amount):
 
 		last_deviation = deviation * safety_order_step_scale
 
+	return dca_orders, tp_orders # dca orders which have order ids
 
 # redo all of this
 
@@ -186,7 +191,7 @@ def place_limit_order(price, position_size, side):
 	response = requests.post(url, headers = HEADERS, data = data_json)
 	print(response.status_code)
 	print(response.json())
-	return response.json()['data']
+	return response.json() # will have to do response.json()['data'] later, for now watch that the orders are correct
 
 	
 def place_market_order(initial_order_buy_amount):
@@ -234,5 +239,6 @@ def account_info():
 
 #funds = account_info() # USDT
 #print(funds)
-dca_bot(initial_safety_buy_amount)  # - main for now
+dca_orders, tp_orders = dca_bot(initial_safety_buy_amount)  # - main for now
 
+# main loop here
