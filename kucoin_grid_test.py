@@ -213,7 +213,7 @@ while True:
 
 		if order_info['isActive'] == closed_order_status:
 			closed_order_ids.append(order_info['orderId'])
-			new_sell_price = order_info['price'] - grid_size
+			new_sell_price = order_info['price'] + grid_size
 			new_sell_order = place_order(new_sell_price, position_size, "SELL")
 			sell_orders.append(new_sell_order)
 
