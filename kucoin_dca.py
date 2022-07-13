@@ -26,7 +26,7 @@ price_deviation_percent = .01 # 1% - normally run .005 or .5%
 
 saftey_order_volume_scale = 2 # multiples orders by - in this case - * 2
 
-funds = 43.50653  # will need to retreive actual available balance
+funds = 38.19664711  # will need to retreive actual available balance
 
 
 # testing these right now
@@ -63,10 +63,11 @@ def dca_bot(initial_safety_buy_amount):
 	print(f"tp_price_with_fee - {tp_price_with_fee}")
 
 	# need to figure out if i want TP to be in an array and if a SO gets excituted, add fee, calculate new tp, etc
-	place_limit_order(tp_price_with_fee, order_quantity, "SELL" )
+	take_profit_order = place_limit_order(tp_price_with_fee, order_quantity, "SELL" )
 
 
 	# ****** currently testing ************
+
 
 
 	for i in range(max_safety_orders):
@@ -75,10 +76,14 @@ def dca_bot(initial_safety_buy_amount):
 		deviated_price = initial_price - (initial_price * deviation)
 		deviated_price = round(deviated_price, 7)  # will be limit price
 
-		# place_limit_order(deviated_price, position_size, "BUY")
+		base_limit_order = initial_safety_buy_amount / deviated_price # - limit needs a base order to buy (Eth in this case)
+		dca_buys = place_limit_order(deviated_price, base_limit_order, "BUY")
+		dca_orders.append(dca_buys)
+
+		#testing
+		print(dca_orders)
 
 		# this print is where limit buys go
-		base_limit_order = initial_safety_buy_amount / deviated_price # - limit needs a base order to buy (Eth in this case)
 		print(f"order # {i+1}")
 		print(deviation, deviated_price, round(initial_safety_buy_amount,7), base_limit_order)
 
@@ -94,8 +99,8 @@ def call_code(data_json=None, order_id=None):
 	if data_json == None:
 		now = int(time.time() * 1000)
 		#str_to_sign = str(now) + 'GET' + '/api/v1/orders?status=active'
-		str_to_sign = str(now) + 'GET' + '/api/v1/accounts'
-		#str_to_sign = str(now) + 'GET' + '/api/v1/fills?orderId=' + order_id
+		#str_to_sign = str(now) + 'GET' + '/api/v1/accounts'
+		str_to_sign = str(now) + 'GET' + '/api/v1/fills?orderId=' + order_id
 		#str_to_sign = str(now) + 'GET' + '/api/v1/symbols'
 		#str_to_sign = str(now) + 'GET' + '/api/v1/orders/' + order_id
 
@@ -174,14 +179,14 @@ def place_limit_order(price, position_size, side):
 		"symbol":"ETH-USDT",  # to be user entered
 		"type":"LIMIT",
 		"price": round(price, 2),   # eth is price increment of 2 decimal places
-		"size":round(position_size,4)   # baseMinSize for ETH - 0.0001
+		"size":round(position_size,7)   # baseMinSize for ETH - 0.0001  baseIncrement - .0000001     7 deciaml places for eth-usdt
 	}
 	data_json = json.dumps(data)
 	HEADERS = call_code(data_json)
 	response = requests.post(url, headers = HEADERS, data = data_json)
 	print(response.status_code)
 	print(response.json())
-	return response.json()
+	return response.json()['data']
 
 	
 def place_market_order(initial_order_buy_amount):
@@ -227,7 +232,7 @@ def account_info():
 	
 
 
-funds = account_info() # USDT
-print(funds)
-#dca_bot(initial_safety_buy_amount)  # - main for now
+#funds = account_info() # USDT
+#print(funds)
+dca_bot(initial_safety_buy_amount)  # - main for now
 
