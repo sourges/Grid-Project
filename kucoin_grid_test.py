@@ -5,15 +5,14 @@ import hashlib
 from config import *
 import hmac
 import base64
-import sys
 
 # - need to save trades to a file in order to view if trades are accurate.  also an error file
 
 ######### in call_code need to figure out 'GET', 'POST', as well as signing #############
-######### test *data_json variable call between both functions, then figure out global variable calls ##########
+######### test *data_json variable call between both functions, then figure out global variable calls
 
 
-###### eventually will need to create a class #############
+
 
 def call_code(data_json=None, order_id=None):
 	if data_json == None:
@@ -68,7 +67,7 @@ def place_order(price, position_size, side):
 		"side":side,
 		"symbol":"FLUX-USDT",
 		"type":"LIMIT",
-		"price":price,
+		"price": round(price, 4),
 		"size":position_size
 	}
 	data_json = json.dumps(data)
@@ -124,7 +123,7 @@ def get_single_ticker():
 
 
 
-# not working - get order for single order id ( not clientOid )
+# not working - get order for single order id ( not clientOid ) ******  working now? ******
 # must know id before use
 def get_order_info(order_id):
 	url = 'https://api.kucoin.com/api/v1/orders/' + order_id
@@ -160,7 +159,8 @@ def test_grid():
 	# sell grid
 	for i in range(number_sell_gridlines):
 		price = (float(current_price) + float(grid_size * (i+1)))
-		price = round(price, 3)
+		price = round(price, 4)
+
 		order = place_order(price, position_size, side = "SELL")
 		sell_orders.append(order['data'])
 		#print(f"Sell orders - {sell_orders}")
@@ -170,10 +170,11 @@ def test_grid():
 	# buy grid
 	for i in range(number_buy_gridlines):
 		price = (float(current_price) - float(grid_size * (i+1)))
-		price = round(price, 3)
+		price = round(price, 4)
+
 		order = place_order(price, position_size, side = "BUY")
 		buy_orders.append(order['data'])
-		print(f"Buy orders - {buy_orders}")
+		#print(f"Buy orders - {buy_orders}")
 
 	
 
@@ -182,47 +183,74 @@ def test_grid():
 		# append to a list
 
 
-test_grid()
+test_grid()   # - upon restart take this out and test what it does before the loop starts
 
 
 while True:
 	closed_order_ids = []
-	print("checking orders")
+	#print("checking orders")
 
 	# put in a try, except - or at least see about being timed out
 
 	for sell_order in sell_orders:
-		order = get_order_info(sell_order['orderId'])
-		print(order)
+		print("checking sells")
+		try:
+			order = get_order_info(sell_order['orderId'])
+		
 
-		order_info = order['data']
+			order_info = order['data']
+			#print(order_info)
+
+			print(f"buy list - {buy_orders}")
+			print(f"sell list - {sell_orders}")
+		except Exception as e:
+			print("failed")
+			continue
 
 		if order_info['isActive'] == closed_order_status:
-			closed_order_ids.append(order_info['orderId'])
-			new_buy_price = order_info['price'] - grid_size
+			closed_order_ids.append(order_info['id'])
+			
+			print(f"Closed Orders - {closed_order_ids}")
+
+			new_buy_price = float(order_info['price']) - grid_size
 			new_buy_order = place_order(new_buy_price, position_size, "BUY")
-			buy_orders.append(new_buy_order)
+			buy_orders.append(new_buy_order['data'])
+
+			
+
+# need to make sure this append works - print out buy_ourders again with new append
+
 
 		time.sleep(check_orders_frequency)
 
 	for buy_order in buy_orders:
-		order = get_order_info(buy_order['orderId'])
-		print(order)
+		try:
+			order = get_order_info(buy_order['orderId'])
+		 	# print(order)
 
-		order_info = order['data']
+			order_info = order['data']
+		except Exception as e:
+			print("error in #2")
+			continue
 
 		if order_info['isActive'] == closed_order_status:
-			closed_order_ids.append(order_info['orderId'])
-			new_sell_price = order_info['price'] + grid_size
+			closed_order_ids.append(order_info['id'])
+
+			print(f"Closed Orders - {closed_order_ids}")
+
+			new_sell_price = float(order_info['price']) + grid_size
 			new_sell_order = place_order(new_sell_price, position_size, "SELL")
-			sell_orders.append(new_sell_order)
+			sell_orders.append(new_sell_order['data'])
 
 		time.sleep(check_orders_frequency)
 
 	
 	for order_id in closed_order_ids:
 		buy_orders = [buy_order for buy_order in buy_orders if buy_order['orderId'] != order_id]
+		print(f" Buy list - {buy_orders}")
+		
 		sell_orders = [sell_order for sell_order in sell_orders if sell_order['orderId'] != order_id]
+		print(f" Sell list - {sell_orders}")
 
 #working
 
