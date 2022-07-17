@@ -1,11 +1,9 @@
 # testing code for DCA bot
 
-# - to do list for 7/15
-
-# - get 'available funds' from account - maybe 7/16
+# - get 'available funds' from account - 
 # - test main loop - as of 7/14 not enough time to see actual testing if it works
 
-# - secondary items for 7/15 - probably for next day
+# - secondary items 
 # - start thinking of a function that will find out - priceIncrement + baseMinSize for base order - for limit at least - see what difference market does - symbol_list has this, see if you can
 #   just call one at a time
 # - priceIncrement + baseMinSize would be used to round() everything
@@ -18,36 +16,14 @@ import time
 import hashlib
 import hmac
 import base64
+import sys
 
 
-# these will eventually be manually entered by the user
-
-safety_order_step_scale = 2
-max_safety_orders = 5
-price_deviation_percent = .01 # 1% - normally run .005 or .5%
-
-saftey_order_volume_scale = 2 # multiples orders by - in this case - * 2
-
-funds = 35.59847051  # will need to retreive actual available balance
-
-
-# testing these right now
-
-base_order_percent =  .02 # 1%
-saftey_order_percent = .02 # 1%
-
-initial_order_buy_amount = funds * base_order_percent # only called once through market order
-initial_safety_buy_amount = funds * saftey_order_percent
-
-# not used yet
-take_profit_percent = .003 # .3% - for now low for scalping / testing
-dca_orders = [] # will need to put all order prices in here to average out to get the % TP
-tp_orders = []
 
 
 # initial buy - eventually from webhook
 
-def dca_bot(initial_safety_buy_amount):
+def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 	order_amount = []
 	order_cost = []
 
@@ -56,6 +32,10 @@ def dca_bot(initial_safety_buy_amount):
 
 	order_id = order_Id['orderId']
 	
+	time.sleep(2) - # added an extra second
+
+	#gives error sometimes
+
 	initial_price, initial_fee, order_quantity = test_fills(order_id)  # returns from market price
 	last_deviation = 0
 
@@ -98,7 +78,7 @@ def dca_bot(initial_safety_buy_amount):
 		order_amount.append(base_limit_order)
 		order_cost.append(initial_safety_buy_amount)
 
-
+		time.sleep(1) # testing
 		dca_buys = place_limit_order(deviated_price, base_limit_order, "BUY")
 		dca_orders.append(dca_buys)
 
@@ -114,7 +94,7 @@ def dca_bot(initial_safety_buy_amount):
 
 
 		last_deviation = deviation * safety_order_step_scale
-		time.sleep(1)
+		#time.sleep(1) - need? - move it up.  sometimes 1st buy bugged out - testing time.sleep for now
 	return dca_orders, tp_orders, order_amount, order_cost # dca orders which have order ids in an array, tp_orders only has one in an array
 
 
@@ -231,19 +211,19 @@ def account_info():
 	url = 'https://api.kucoin.com/api/v1/accounts'
 	response = requests.get(url, headers = HEADERS)
 	print(response.status_code)
-	funds = []
+	#funds = [] # come back to this when other tokens are added
 	#prints available balance
 	for i in range(len(response.json()['data'])):
 		if response.json()['data'][i]['currency'] == 'USDT':
-			return response.json()['data'][i]['available'] # return USDT for now
+			available_funds = response.json()['data'][i]['available']
+			return  float(available_funds) # return USDT for now
 		# if response.json()['data'][i]['balance'] > "0":  # these three line will print all balances > 0
 			# print(response.json()['data'][i])  
 			# funds.append(response.json()['data'][i])
 	
 
 
-#funds = account_info() # USDT
-#print(funds)
+
 
 
 
@@ -277,105 +257,120 @@ def cancel_orders(order_id):
 	response = requests.delete(url, headers = HEADERS)
 
 
+def main():
+	funds = account_info()
+	print(funds)
+
+	# moved alot of variables to config
+
+	initial_order_buy_amount = funds * base_order_percent # only called once through market order
+	initial_safety_buy_amount = funds * saftey_order_percent
 
 
-# main loop here
+	dca_orders, tp_orders, order_amount, order_cost = dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount)  # - main for now
 
-dca_orders, tp_orders, order_amount, order_cost = dca_bot(initial_safety_buy_amount)  # - main for now
-
-# for testing purpose
-count = 1 
+	# for testing purpose
+	count = 1 
 
 
-# total cost / total amount
+	# total cost / total amount
 
-total_order_cost = order_cost[0]
-total_order_amount = order_amount[0]
+	total_order_cost = order_cost[0]
+	total_order_amount = order_amount[0]
 
-# just for test, will delete later
-average_cost = order_cost[0] / order_amount[0]
-print(f"testing average cost - {average_cost}")
+	# just for test, will delete later
+	average_cost = order_cost[0] / order_amount[0]
+	print(f"testing average cost - {average_cost}")
 
-# keep
-del order_cost[0]
-del order_amount[0]
-
-
-while True:
-
-	# if the tp has been filled, delete all dca orders
-	for tp_order in tp_orders:  # is this necessary if there is always only one TP?
-		time.sleep(5) # needed at all?
-		print("checking TP")
-		order = get_order_info(tp_order['orderId'])
-		print(order)
-		print(f"TP status is - {order['data']['isActive']}")
-		if order['data']['isActive'] == closed_order_status:
-			for dca_order in dca_orders:
-				print("TP HIT - CANCELLING ORDERS!!")
-				cancel_orders(dca_order['orderId'])
-				print(f"cancelling orderID - {dca_order['orderId']}")
-				time.sleep(1)
-
-			# quit() or some function to close program?  for now only testing 1 test at a time and not 2+
-
-		# close all dca orders - this currently works
-
-	print(f"testing order_amount array - {order_amount}")
-	print(f"testing order_cost array - {order_cost}")
-
-	order = get_order_info(dca_orders[0]['orderId'])
-
-	print(f"general tp_orders test - {tp_orders[0]['orderId']}")  # testing to see if correct to cancel order
-
-	# test try / except since 'if order['data']['isActive'] == closed_order_status' bugs out once in awhile
-	
-	try:
-		if order['data']['isActive'] == closed_order_status:
-			print(f"current count - {count} - dca order")
-			count += 1
-			
-
-			total_order_cost += order_cost[0]
-			total_order_amount += order_amount[0]
-			average_cost = total_order_cost / total_order_amount
-			del order_cost[0]
-			del order_amount[0]
-
-			cancel_orders(tp_orders[0]['orderId'])  # gave an error last time, but tp was already hit.  need to test this when DCA is hit - probably need tp_orders[0]['orderId']
-
-			print("cancelling TP order")
-			del tp_orders[0]
-			print(f"empty here? - {tp_orders}")
+	# keep
+	del order_cost[0]
+	del order_amount[0]
 
 
-			print(f"new order_cost after TP hit - {order_cost}")
-			print(f"new order_amount after TP hit - {order_amount}")
-			print(f"new average cost - {average_cost}")
-			
-			tp_price = (average_cost * .003) + average_cost
-			print(f"TP price = {tp_price}")
+	while True:
 
-			print("new TP order")
-			take_profit_order = place_limit_order(tp_price, total_order_amount, "SELL" )
-			print(take_profit_order)
+		# if the tp has been filled, delete all dca orders
+		for tp_order in tp_orders:  # is this necessary if there is always only one TP?
+			time.sleep(5) # needed at all?
+			print("checking TP")
+			order = get_order_info(tp_order['orderId'])
+			print(order)
+			print(f"TP status is - {order['data']['isActive']}")
+			if order['data']['isActive'] == closed_order_status:   
+				for dca_order in dca_orders:
+					print("TP HIT - CANCELLING ORDERS!!")
+					cancel_orders(dca_order['orderId'])
+					print(f"cancelling orderID - {dca_order['orderId']}")
+					time.sleep(1)
+				sys.exit()
+
+				# quit() or some function to close program?  for now only testing 1 test at a time and not 2+
+
+			# close all dca orders - this currently works
+
+		print(f"testing order_amount array - {order_amount}")
+		print(f"testing order_cost array - {order_cost}")
+
+		order = get_order_info(dca_orders[0]['orderId'])
+
+		print(f"general tp_orders test - {tp_orders[0]['orderId']}")  # testing to see if correct to cancel order
 
 
-			print("deleting 1st [0] dca order")
-			del dca_orders[0]
-			print("checking dca array")
-			print(dca_orders)
-
-
-			# new TP here
-			tp_orders.append(take_profit_order)
-			print(f"add new TP order to array - {tp_orders}")
-	except Exception as e:
-		print("request failed")
-		continue
+		# this if 
 
 
 
+		# delete this try, not proper
+		
+		try:
+			if order['data']['isActive'] == closed_order_status:
+				print(f"current count - {count} - dca order")
+				count += 1
+				
+
+				total_order_cost += order_cost[0]
+				total_order_amount += order_amount[0]
+				average_cost = total_order_cost / total_order_amount
+				del order_cost[0]
+				del order_amount[0]
+
+				cancel_orders(tp_orders[0]['orderId'])  #  need to test this when DCA is hit - probably need tp_orders[0]['orderId'] - currently works
+
+				print("cancelling TP order")
+				del tp_orders[0]
+				print(f"empty here? - {tp_orders}")
 
 
+				print(f"new order_cost after TP hit - {order_cost}")
+				print(f"new order_amount after TP hit - {order_amount}")
+				print(f"new average cost - {average_cost}")
+				
+				tp_price = (average_cost * .003) + average_cost
+				print(f"TP price = {tp_price}")
+
+				print("new TP order")
+				take_profit_order = place_limit_order(tp_price, total_order_amount, "SELL" )
+				print(take_profit_order)
+
+
+				print("deleting 1st [0] dca order")
+				del dca_orders[0]
+				print("checking dca array")
+				print(dca_orders)
+
+
+				# new TP here
+				tp_orders.append(take_profit_order)
+				print(f"add new TP order to array - {tp_orders}")
+		except Exception as e:
+			print("request failed")
+			continue
+
+
+
+
+
+
+if __name__ == "__main__":
+	main()
 
