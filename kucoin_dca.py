@@ -360,7 +360,7 @@ def main():
 				print(f"new order_amount after TP hit - {order_amount}")
 				print(f"new average cost - {average_cost}")
 				
-				tp_price = (average_cost * .003) + average_cost
+				tp_price = (average_cost * .003) + average_cost # change to take_profit_percent
 				print(f"TP price = {tp_price}")
 
 				print("new TP order")
