@@ -32,7 +32,7 @@ def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 
 	order_id = order_Id['orderId']
 	
-	time.sleep(2) - # added an extra second
+	time.sleep(2)  # added an extra second
 
 	#gives error sometimes
 
@@ -68,7 +68,7 @@ def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 	
 	for i in range(max_safety_orders):
 		deviation = price_deviation_percent + last_deviation
-		deviation = round(deviation, 2)
+		deviation = round(deviation, 3)
 		deviated_price = initial_price - (initial_price * deviation)
 		deviated_price = round(deviated_price, 7)  # will be limit price
 
@@ -129,7 +129,7 @@ def get_order_info(order_id):
 	data_json = None
 	HEADERS = call_code(str_to_sign ,data_json, order_id)
 	response = requests.get(url, headers = HEADERS)
-	# print("order info method")
+	# print("inside get_order_info")
 	# print(response.status_code)
 	# print(response.json())
 	return response.json()
@@ -171,6 +171,9 @@ def place_limit_order(price, position_size, side):
 	str_to_sign = str(now) + 'POST' + '/api/v1/orders' + data_json
 	HEADERS = call_code(str_to_sign, data_json)
 	response = requests.post(url, headers = HEADERS, data = data_json)
+
+	print(response.json())  #
+
 	return response.json()['data']
 
 
@@ -264,6 +267,9 @@ def main():
 	# moved alot of variables to config
 
 	initial_order_buy_amount = funds * base_order_percent # only called once through market order
+
+	print(f"TESTING initial_order_buy_amount - {initial_order_buy_amount}")
+	
 	initial_safety_buy_amount = funds * saftey_order_percent
 
 
@@ -271,6 +277,10 @@ def main():
 
 	# for testing purpose
 	count = 1 
+
+	print(order_cost)
+	print(order_amount)
+
 
 
 	# total cost / total amount
@@ -281,6 +291,8 @@ def main():
 	# just for test, will delete later
 	average_cost = order_cost[0] / order_amount[0]
 	print(f"testing average cost - {average_cost}")
+	print(f"testing total_order_cost - {total_order_cost}")
+	print(f"testing total_order_amount - {total_order_amount}")
 
 	# keep
 	del order_cost[0]
@@ -293,18 +305,21 @@ def main():
 		for tp_order in tp_orders:  # is this necessary if there is always only one TP?
 			time.sleep(5) # needed at all?
 			print("checking TP")
-			order = get_order_info(tp_order['orderId'])
-			print(order)
-			print(f"TP status is - {order['data']['isActive']}")
-			if order['data']['isActive'] == closed_order_status:   
-				for dca_order in dca_orders:
-					print("TP HIT - CANCELLING ORDERS!!")
-					cancel_orders(dca_order['orderId'])
-					print(f"cancelling orderID - {dca_order['orderId']}")
-					time.sleep(1)
-				sys.exit()
-
-				# quit() or some function to close program?  for now only testing 1 test at a time and not 2+
+			try:
+				order = get_order_info(tp_order['orderId'])
+				print(order)
+				print(f"TP status is - {order['data']['isActive']}")
+				if order['data']['isActive'] == closed_order_status:   
+					for dca_order in dca_orders:
+						print("TP HIT - CANCELLING ORDERS!!")
+						cancel_orders(dca_order['orderId'])
+						print(f"cancelling orderID - {dca_order['orderId']}")
+						time.sleep(1)
+					sys.exit()
+			except Exception as e:
+				print("tp_order check status failed")
+				continue
+				
 
 			# close all dca orders - this currently works
 
@@ -373,4 +388,3 @@ def main():
 
 if __name__ == "__main__":
 	main()
-
