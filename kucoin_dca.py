@@ -2,6 +2,7 @@
 
 # - get 'available funds' from account - 
 # - test main loop - as of 7/14 not enough time to see actual testing if it works
+# - look at time.sleep() - probably spamming api which is giving issues 
 
 # - secondary items 
 # - start thinking of a function that will find out - priceIncrement + baseMinSize for base order - for limit at least - see what difference market does - symbol_list has this, see if you can
@@ -53,6 +54,9 @@ def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 
 	# print for testing purposes
 	print(f"tp_price_with_fee - {tp_price_with_fee}")
+
+
+	time.sleep(1) # *************************** added ************************
 
 	# need to figure out if i want TP to be in an array and if a SO gets excituted, add fee, calculate new tp, etc
 	take_profit_order = place_limit_order(tp_price_with_fee, order_quantity, "SELL" )
@@ -273,6 +277,8 @@ def main():
 	initial_safety_buy_amount = funds * saftey_order_percent
 
 
+	time.sleep(1)  # ************************ new ********************
+
 	dca_orders, tp_orders, order_amount, order_cost = dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount)  # - main for now
 
 	# for testing purpose
@@ -326,6 +332,8 @@ def main():
 		print(f"testing order_amount array - {order_amount}")
 		print(f"testing order_cost array - {order_cost}")
 
+		time.sleep(1) # ************************* added **********************
+
 		order = get_order_info(dca_orders[0]['orderId'])
 
 		print(f"general tp_orders test - {tp_orders[0]['orderId']}")  # testing to see if correct to cancel order
@@ -349,6 +357,9 @@ def main():
 				del order_cost[0]
 				del order_amount[0]
 
+
+				time.sleep(1)  # ***************************** added ************************
+
 				cancel_orders(tp_orders[0]['orderId'])  #  need to test this when DCA is hit - probably need tp_orders[0]['orderId'] - currently works
 
 				print("cancelling TP order")
@@ -364,6 +375,10 @@ def main():
 				print(f"TP price = {tp_price}")
 
 				print("new TP order")
+
+				time.sleep(1) # ****************************** added ***************************
+
+
 				take_profit_order = place_limit_order(tp_price, total_order_amount, "SELL" )
 				print(take_profit_order)
 
