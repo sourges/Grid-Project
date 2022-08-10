@@ -65,7 +65,7 @@ def place_order(price, position_size, side):
 	data = {
 		"clientOid":now,
 		"side":side,
-		"symbol":"FLUX-USDT",
+		"symbol":config.symbol,
 		"type":"LIMIT",
 		"price": round(price, 4),
 		"size":position_size
@@ -109,10 +109,10 @@ def get_all_tickers():
 # gets single ticker info - must know which ticker request
 def get_single_ticker():
 	#must create a variable for symbol
-	response = requests.get('https://api.kucoin.com/api/v1/market/orderbook/level2_20?symbol=FLUX-USDT')
+	response = requests.get(f'https://api.kucoin.com/api/v1/market/orderbook/level2_20?symbol={config.symbol}')
 	print(response.status_code)
-	print("FLUX-USDT Asks - " + response.json()['data']['asks'][0][0])
-	print("FLUX-USDT Bids - " + response.json()['data']['bids'][0][0])
+	print(f"{config.symbol} Asks - " + response.json()['data']['asks'][0][0])
+	print(f"{config.symbol} Bids - " + response.json()['data']['bids'][0][0])
 
 
 	#return response.json()['data']['asks'][0][0], response.json()['data']['bids'][0][0]
@@ -204,7 +204,7 @@ while True:
 			print(f"buy list - {buy_orders}")
 			print(f"sell list - {sell_orders}")
 		except Exception as e:
-			print("failed")
+			print("error in #1")
 			continue
 
 		if order_info['isActive'] == closed_order_status:
