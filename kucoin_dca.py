@@ -403,14 +403,3 @@ def main():
 if __name__ == "__main__":
 	main()
 
-
-def get_symbols():
-	now = int(time.time() * 1000)
-	str_to_sign = str(now) + 'GET' + '/api/v1/symbols'
-	url = 'https://api.kucoin.com/api/v1/symbols'
-	HEADERS = call_code(str_to_sign)
-	response = requests.get(url, headers = HEADERS)
-	print(response.status_code)
-	print(response.json())
-
-#get_symbols()
