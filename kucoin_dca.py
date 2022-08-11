@@ -1,13 +1,7 @@
 # testing code for DCA bot
 
-# - get 'available funds' from account - 
-# - test main loop - as of 7/14 not enough time to see actual testing if it works
-# - look at time.sleep() - probably spamming api which is giving issues 
 
-# - secondary items 
-# - start thinking of a function that will find out - priceIncrement + baseMinSize for base order - for limit at least - see what difference market does - symbol_list has this, see if you can
-#   just call one at a time
-# - priceIncrement + baseMinSize would be used to round() everything
+# - baseIncrement + quoteIncrement + priceIncrement - important - need to fix
 
 
 from config import *
@@ -35,7 +29,6 @@ def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 	
 	time.sleep(2)  # added an extra second
 
-	#gives error sometimes
 
 	initial_price, initial_fee, order_quantity = test_fills(order_id)  # returns from market price
 	last_deviation = 0
@@ -166,10 +159,10 @@ def place_limit_order(price, position_size, side):
 	data = {
 		"clientOid":now,
 		"side":side,
-		"symbol":"ETH-USDT",  # to be user entered
+		"symbol":"SUSHI-USDT",  # to be user entered
 		"type":"LIMIT",
 		"price": round(price, 2),   # eth is price increment of 2 decimal places
-		"size":round(position_size,7)   # baseMinSize for ETH - 0.0001  baseIncrement - .0000001     7 deciaml places for eth-usdt
+		"size":round(position_size, 4)   # ****************************  baseIncrement - .0000001     7 deciaml places for eth-usdt   - sushi - 4
 	}
 	data_json = json.dumps(data)
 	str_to_sign = str(now) + 'POST' + '/api/v1/orders' + data_json
@@ -190,9 +183,9 @@ def place_market_order(initial_order_buy_amount):
 	data = {
 		"clientOid":now,    # client, side/funds, size, type, and symbol are required
 		"side":"BUY",
-		"symbol":"ETH-USDT",  # to bo user entered
+		"symbol":"SUSHI-USDT",  # to bo user entered
 		"type":"MARKET",
-		"funds":initial_order_buy_amount
+		"funds":round(initial_order_buy_amount, 4)   # ****************************************** - quoteIncrement 
 	}
 
 	data_json = json.dumps(data)
@@ -200,6 +193,10 @@ def place_market_order(initial_order_buy_amount):
 	HEADERS = call_code(str_to_sign, data_json)
 	response = requests.post(url, headers = HEADERS, data = data_json)
 	
+
+	print(f"market test - {response.json()}")
+
+
 	# test to see if sleep can be dropped to 4
 	time.sleep(5)
 	print("response.json inside place_market_order")
@@ -403,3 +400,15 @@ def main():
 
 if __name__ == "__main__":
 	main()
+
+
+def get_symbols():
+	now = int(time.time() * 1000)
+	str_to_sign = str(now) + 'GET' + '/api/v1/symbols'
+	url = 'https://api.kucoin.com/api/v1/symbols'
+	HEADERS = call_code(str_to_sign)
+	response = requests.get(url, headers = HEADERS)
+	print(response.status_code)
+	print(response.json())
+
+#get_symbols()
