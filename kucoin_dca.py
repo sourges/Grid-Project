@@ -3,8 +3,7 @@
 
 # - baseIncrement + quoteIncrement + priceIncrement - important - need to fix
 
-
-from config import *
+import config
 import json
 import requests
 import time
@@ -21,6 +20,9 @@ import sys
 def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 	order_amount = []
 	order_cost = []
+
+	dca_orders = []  # testing
+	tp_orders = []
 
 	# might also need a try / except to make sure the order is actually placed before any dca or tp are placed
 	order_Id = place_market_order(round(initial_order_buy_amount,6))  # can move this round somewhere else - main issue is its different for each base - market only quoteIncrement
@@ -42,7 +44,7 @@ def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 	print(f"market buy fee - {initial_fee}")
 	print(f"order quantity - {order_quantity}")
 
-	tp_price_with_fee = ((initial_price + initial_fee) * take_profit_percent) + initial_price
+	tp_price_with_fee = ((initial_price + initial_fee) * config.take_profit_percent) + initial_price
 	
 
 	# print for testing purposes
@@ -63,8 +65,8 @@ def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 
 
 	
-	for i in range(max_safety_orders):
-		deviation = price_deviation_percent + last_deviation
+	for i in range(config.max_safety_orders):
+		deviation = config.price_deviation_percent + last_deviation
 		deviation = round(deviation, 3)
 		deviated_price = initial_price - (initial_price * deviation)
 		deviated_price = round(deviated_price, 7)  # will be limit price
@@ -86,11 +88,11 @@ def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 		print(f"order # {i+1}")
 		print(deviation, deviated_price, round(initial_safety_buy_amount,7), base_limit_order)
 
-		initial_safety_buy_amount *= saftey_order_volume_scale 
+		initial_safety_buy_amount *= config.saftey_order_volume_scale 
 		initial_safety_buy_amount = round(initial_safety_buy_amount, 7)
 
 
-		last_deviation = deviation * safety_order_step_scale
+		last_deviation = deviation * config.safety_order_step_scale
 		#time.sleep(1) - need? - move it up.  sometimes 1st buy bugged out - testing time.sleep for now
 	return dca_orders, tp_orders, order_amount, order_cost # dca orders which have order ids in an array, tp_orders only has one in an array
 
@@ -100,10 +102,10 @@ def call_code(str_to_sign ,data_json=None, order_id=None):
 	#print(str_to_sign)
 	now = int(time.time() * 1000)
 	signature = base64.b64encode(
-		hmac.new(api_secret.encode('utf-8'), str_to_sign.encode('utf-8'), hashlib.sha256).digest())
-	passphrase = base64.b64encode(hmac.new(api_secret.encode('utf-8'), api_passphrase.encode('utf-8'), hashlib.sha256).digest())
+		hmac.new(config.api_secret.encode('utf-8'), str_to_sign.encode('utf-8'), hashlib.sha256).digest())
+	passphrase = base64.b64encode(hmac.new(config.api_secret.encode('utf-8'), config.api_passphrase.encode('utf-8'), hashlib.sha256).digest())
 	HEADERS = {
-		"KC-API-KEY": api_key,
+		"KC-API-KEY": config.api_key,
 		"KC-API-SIGN": signature,
 		"KC-API-TIMESTAMP": str(now),
 		"KC-API-PASSPHRASE": passphrase,
@@ -159,7 +161,7 @@ def place_limit_order(price, position_size, side):
 	data = {
 		"clientOid":now,
 		"side":side,
-		"symbol":"SUSHI-USDT",  # to be user entered
+		"symbol":config.traded_pair,  # to be user entered
 		"type":"LIMIT",
 		"price": round(price, 2),   # eth is price increment of 2 decimal places
 		"size":round(position_size, 4)   # ****************************  baseIncrement - .0000001     7 deciaml places for eth-usdt   - sushi - 4
@@ -183,7 +185,7 @@ def place_market_order(initial_order_buy_amount):
 	data = {
 		"clientOid":now,    # client, side/funds, size, type, and symbol are required
 		"side":"BUY",
-		"symbol":"SUSHI-USDT",  # to bo user entered
+		"symbol":config.traded_pair,  # to bo user entered
 		"type":"MARKET",
 		"funds":round(initial_order_buy_amount, 4)   # ****************************************** - quoteIncrement 
 	}
@@ -267,11 +269,11 @@ def main():
 
 	# moved alot of variables to config
 
-	initial_order_buy_amount = funds * base_order_percent # only called once through market order
+	initial_order_buy_amount = funds * config.base_order_percent # only called once through market order
 
 	print(f"TESTING initial_order_buy_amount - {initial_order_buy_amount}")
 	
-	initial_safety_buy_amount = funds * saftey_order_percent
+	initial_safety_buy_amount = funds * config.saftey_order_percent
 
 
 	time.sleep(1)  # ************************ new ********************
@@ -312,7 +314,7 @@ def main():
 				order = get_order_info(tp_order['orderId'])
 				print(order)
 				print(f"TP status is - {order['data']['isActive']}")
-				if order['data']['isActive'] == closed_order_status:   
+				if order['data']['isActive'] == config.closed_order_status:   
 					for dca_order in dca_orders:
 						print("TP HIT - CANCELLING ORDERS!!")
 						cancel_orders(dca_order['orderId'])
@@ -343,7 +345,7 @@ def main():
 		# delete this try, not proper
 		
 		try:
-			if order['data']['isActive'] == closed_order_status:
+			if order['data']['isActive'] == config.closed_order_status:
 				print(f"current count - {count} - dca order")
 				count += 1
 				
@@ -368,7 +370,7 @@ def main():
 				print(f"new order_amount after TP hit - {order_amount}")
 				print(f"new average cost - {average_cost}")
 				
-				tp_price = (average_cost * .003) + average_cost # change to take_profit_percent
+				tp_price = (average_cost * config.take_profit_percent) + average_cost
 				print(f"TP price = {tp_price}")
 
 				print("new TP order")
