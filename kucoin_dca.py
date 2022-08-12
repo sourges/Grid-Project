@@ -2,7 +2,7 @@
 
 # - baseIncrement + quoteIncrement + priceIncrement - updated
 # - clean up comments
-# - current bug - if market order buys into 2 or 3 orders (partial fills), TP is only placed with just one of those orders and not the full amount
+# - current bug - if market order buys into 2 or 3 orders (partial fills), TP is only placed with just one of those orders and not the full amount - currently testing fix
 
 import config
 import json
@@ -138,8 +138,13 @@ def test_fills(order_id):
 	print(response.json())
 	price = response.json()['data']['items'][0]['price']
 	initial_fee = response.json()['data']['items'][0]['fee']
-	order_quantity = response.json()['data']['items'][0]['size']
-	return float(price), float(initial_fee), float(order_quantity)
+	
+	#order_quantity = response.json()['data']['items'][0]['size']
+	totalNum = 0
+	for i in range(response.json()['data']['totalNum']):   # if market order fill by way of more than 1 order ( 2+ orders ) - testing for now
+		print(totalNum)
+		totalNum += float(response.json()['data']['items'][i]['size'])
+	return float(price), float(initial_fee), totalNum
 
 
 # - working
