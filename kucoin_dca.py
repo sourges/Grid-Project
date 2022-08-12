@@ -1,8 +1,8 @@
 # testing code for DCA bot
 
-
-# - baseIncrement + quoteIncrement + priceIncrement - important - need to fix
+# - baseIncrement + quoteIncrement + priceIncrement - updated
 # - clean up comments
+# - current bug - if market order buys into 2 or 3 orders (partial fills), TP is only placed with just one of those orders and not the full amount
 
 import config
 import json
@@ -15,24 +15,15 @@ import sys
 
 
 
-
-# initial buy - eventually from webhook
-
 def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
-	order_amount = []
-	order_cost = []
-
-	dca_orders = []  # testing
-	tp_orders = []
+	order_amount, order_cost, dca_orders, tp_orders = [], [], [], []
 
 	# might also need a try / except to make sure the order is actually placed before any dca or tp are placed
 
 	order_Id = place_market_order(initial_order_buy_amount)
-	# order_Id = place_market_order(round(initial_order_buy_amount,6))  # can move this round somewhere else - main issue is its different for each base - market only quoteIncrement
-
 	order_id = order_Id['orderId']
 	
-	time.sleep(2)  # added an extra second
+	time.sleep(2)  # had issues before with 1 sec, seen no issues with updated code, might want to try back to 1 sec
 
 
 	initial_price, initial_fee, order_quantity = test_fills(order_id)  # returns from market price
@@ -49,34 +40,28 @@ def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 
 	tp_price_with_fee = ((initial_price + initial_fee) * config.take_profit_percent) + initial_price
 	
-
 	# print for testing purposes
 	print(f"tp_price_with_fee - {tp_price_with_fee}")
 
 
-	time.sleep(1) # *************************** added ************************
+	time.sleep(1)
 
-	# need to figure out if i want TP to be in an array and if a SO gets excituted, add fee, calculate new tp, etc
 	take_profit_order = place_limit_order(tp_price_with_fee, order_quantity, "SELL" )
 
-	tp_orders.append(take_profit_order) # should have to ['data'] but on next buy test look at print
+	tp_orders.append(take_profit_order)
 
 	print("testing - tp_orders")
 	print(tp_orders)
 
-	# ****** currently testing ************
 
-
-	
 	for i in range(config.max_safety_orders):
 		deviation = config.price_deviation_percent + last_deviation
 		deviation = round(deviation, 3)
 		deviated_price = initial_price - (initial_price * deviation)
-		deviated_price = round(deviated_price, 7)  # will be limit price
+		deviated_price = round(deviated_price, 7)
 
-		base_limit_order = initial_safety_buy_amount / deviated_price # - limit needs a base order to buy (Eth in this case)
+		base_limit_order = initial_safety_buy_amount / deviated_price 
 
-		# testing
 		order_amount.append(base_limit_order)
 		order_cost.append(initial_safety_buy_amount)
 
@@ -86,8 +71,6 @@ def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 
 		#testing
 		print(dca_orders)
-
-		# this print is where limit buys go
 		print(f"order # {i+1}")
 		print(deviation, deviated_price, round(initial_safety_buy_amount,7), base_limit_order)
 
@@ -96,13 +79,10 @@ def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 
 
 		last_deviation = deviation * config.safety_order_step_scale
-		#time.sleep(1) - need? - move it up.  sometimes 1st buy bugged out - testing time.sleep for now
-	return dca_orders, tp_orders, order_amount, order_cost # dca orders which have order ids in an array, tp_orders only has one in an array
+	return dca_orders, tp_orders, order_amount, order_cost 
 
 
 def call_code(str_to_sign ,data_json=None, order_id=None):
-	#print(data_json)
-	#print(str_to_sign)
 	now = int(time.time() * 1000)
 	signature = base64.b64encode(
 		hmac.new(config.api_secret.encode('utf-8'), str_to_sign.encode('utf-8'), hashlib.sha256).digest())
@@ -125,13 +105,10 @@ def get_symbols():
 	url = f'https://api.kucoin.com/api/v1/symbols/{config.traded_pair}'
 	HEADERS = call_code(str_to_sign)
 	response = requests.get(url, headers = HEADERS)
-	#print(response.status_code)
-	#print(response.json())
 	baseIncrement = len(response.json()['data']['baseIncrement'].split('.')[1])
 	quoteIncrement = len(response.json()['data']['quoteIncrement'].split('.')[1])
 	priceIncrement = len(response.json()['data']['priceIncrement'].split('.')[1])
 	return baseIncrement, quoteIncrement, priceIncrement
-
 
 
 
@@ -143,9 +120,6 @@ def get_order_info(order_id):
 	data_json = None
 	HEADERS = call_code(str_to_sign ,data_json, order_id)
 	response = requests.get(url, headers = HEADERS)
-	# print("inside get_order_info")
-	# print(response.status_code)
-	# print(response.json())
 	return response.json()
 
 
@@ -170,25 +144,24 @@ def test_fills(order_id):
 
 # - working
 def place_limit_order(price, position_size, side):
-	# is position_size needed for an arguement if its coming from config
-
+	
 	url = 'https://api.kucoin.com/api/v1/orders'
 	now = int(time.time() * 1000)
 	data = {
 		"clientOid":now,
 		"side":side,
-		"symbol":config.traded_pair,  # to be user entered
+		"symbol":config.traded_pair,  
 		"type":"LIMIT",
-		"price": round(price, priceIncrement),   #   update to priceIncrement 
-		"size":round(position_size, baseIncrement)   #   update to baseIncrement 
+		"price": round(price, priceIncrement),   
+		"size":round(position_size, baseIncrement)   
 	}
 	data_json = json.dumps(data)
 	str_to_sign = str(now) + 'POST' + '/api/v1/orders' + data_json
 	HEADERS = call_code(str_to_sign, data_json)
 	response = requests.post(url, headers = HEADERS, data = data_json)
 
+	# print for testing
 	print(response.json()) 
-
 	return response.json()['data']
 
 
@@ -199,11 +172,11 @@ def place_market_order(initial_order_buy_amount):
 	url = 'https://api.kucoin.com/api/v1/orders'
 	now = int(time.time() * 1000)
 	data = {
-		"clientOid":now,    # client, side/funds, size, type, and symbol are required
+		"clientOid":now,    
 		"side":"BUY",
-		"symbol":config.traded_pair,  # to bo user entered
+		"symbol":config.traded_pair,  
 		"type":"MARKET",
-		"funds":round(initial_order_buy_amount, quoteIncrement)   #  - quoteIncrement 
+		"funds":round(initial_order_buy_amount, quoteIncrement) 
 	}
 
 	data_json = json.dumps(data)
@@ -245,15 +218,6 @@ def account_info():
 	
 
 
-
-
-
-
-#print(f"testing - dca_orders {dca_orders}")
-#print(f"testing - tp_orders {tp_orders}")
-
-
-
 def get_order_list():
 	url = 'https://api.kucoin.com/api/v1/orders?status=active'
 	now = int(time.time() * 1000)
@@ -270,7 +234,6 @@ def get_order_list():
 # will not use cancel all from api due to other trades in progress
 
 def cancel_orders(order_id):
-	# since orders will be in an array, will make a 'for' loop to cycle through oderID and delete
 	url = 'https://api.kucoin.com/api/v1/orders/' + order_id
 	now = int(time.time() * 1000)
 	str_to_sign = str(now) + 'DELETE' + '/api/v1/orders/' + order_id
@@ -317,7 +280,7 @@ def main():
 	print(f"testing total_order_cost - {total_order_cost}")
 	print(f"testing total_order_amount - {total_order_amount}")
 
-	# keep
+	
 	del order_cost[0]
 	del order_amount[0]
 
@@ -349,18 +312,13 @@ def main():
 		print(f"testing order_amount array - {order_amount}")
 		print(f"testing order_cost array - {order_cost}")
 
-		time.sleep(1) # ************************* added **********************
-
+		time.sleep(1) 
 		order = get_order_info(dca_orders[0]['orderId'])
 
 		print(f"general tp_orders test - {tp_orders[0]['orderId']}")  # testing to see if correct to cancel order
 
 
-		# this if 
-
-
-
-		# delete this try, not proper
+		# try needed at all?
 		
 		try:
 			if order['data']['isActive'] == config.closed_order_status:
@@ -375,7 +333,7 @@ def main():
 				del order_amount[0]
 
 
-				time.sleep(1)  # ***************************** added ************************
+				time.sleep(1) 
 
 				cancel_orders(tp_orders[0]['orderId'])  #  need to test this when DCA is hit - probably need tp_orders[0]['orderId'] - currently works
 
@@ -393,7 +351,7 @@ def main():
 
 				print("new TP order")
 
-				time.sleep(1) # ****************************** added ***************************
+				time.sleep(1) 
 
 
 				take_profit_order = place_limit_order(tp_price, total_order_amount, "SELL" )
