@@ -2,6 +2,7 @@
 
 
 # - baseIncrement + quoteIncrement + priceIncrement - important - need to fix
+# - clean up comments
 
 import config
 import json
@@ -25,7 +26,9 @@ def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 	tp_orders = []
 
 	# might also need a try / except to make sure the order is actually placed before any dca or tp are placed
-	order_Id = place_market_order(round(initial_order_buy_amount,6))  # can move this round somewhere else - main issue is its different for each base - market only quoteIncrement
+
+	order_Id = place_market_order(initial_order_buy_amount)
+	# order_Id = place_market_order(round(initial_order_buy_amount,6))  # can move this round somewhere else - main issue is its different for each base - market only quoteIncrement
 
 	order_id = order_Id['orderId']
 	
@@ -116,6 +119,18 @@ def call_code(str_to_sign ,data_json=None, order_id=None):
 
 
 
+def get_symbols(): 
+	now = int(time.time() * 1000)
+	str_to_sign = str(now) + 'GET' + '/api/v1/symbols/'
+	url = f'https://api.kucoin.com/api/v1/symbols/{config.traded_pair}'
+	HEADERS = call_code(str_to_sign)
+	response = requests.get(url, headers = HEADERS)
+	#print(response.status_code)
+	#print(response.json())
+	baseIncrement = len(response.json()['data']['baseIncrement'].split('.')[1])
+	quoteIncrement = len(response.json()['data']['quoteIncrement'].split('.')[1])
+	priceIncrement = len(response.json()['data']['priceIncrement'].split('.')[1])
+	return baseIncrement, quoteIncrement, priceIncrement
 
 
 
@@ -146,11 +161,12 @@ def test_fills(order_id):
 	
 	# for test purposes
 
-	#print(response.json())
+	print(response.json())
 	price = response.json()['data']['items'][0]['price']
 	initial_fee = response.json()['data']['items'][0]['fee']
 	order_quantity = response.json()['data']['items'][0]['size']
 	return float(price), float(initial_fee), float(order_quantity)
+
 
 # - working
 def place_limit_order(price, position_size, side):
@@ -163,15 +179,15 @@ def place_limit_order(price, position_size, side):
 		"side":side,
 		"symbol":config.traded_pair,  # to be user entered
 		"type":"LIMIT",
-		"price": round(price, 2),   # eth is price increment of 2 decimal places
-		"size":round(position_size, 4)   # ****************************  baseIncrement - .0000001     7 deciaml places for eth-usdt   - sushi - 4
+		"price": round(price, priceIncrement),   #   update to priceIncrement 
+		"size":round(position_size, baseIncrement)   #   update to baseIncrement 
 	}
 	data_json = json.dumps(data)
 	str_to_sign = str(now) + 'POST' + '/api/v1/orders' + data_json
 	HEADERS = call_code(str_to_sign, data_json)
 	response = requests.post(url, headers = HEADERS, data = data_json)
 
-	print(response.json())  #
+	print(response.json()) 
 
 	return response.json()['data']
 
@@ -187,13 +203,13 @@ def place_market_order(initial_order_buy_amount):
 		"side":"BUY",
 		"symbol":config.traded_pair,  # to bo user entered
 		"type":"MARKET",
-		"funds":round(initial_order_buy_amount, 4)   # ****************************************** - quoteIncrement 
+		"funds":round(initial_order_buy_amount, quoteIncrement)   #  - quoteIncrement 
 	}
 
 	data_json = json.dumps(data)
 	str_to_sign = str(now) + 'POST' + '/api/v1/orders' + data_json
 	HEADERS = call_code(str_to_sign, data_json)
-	response = requests.post(url, headers = HEADERS, data = data_json)
+	response = requests.post(url, headers = HEADERS, data = data_json)  
 	
 
 	print(f"market test - {response.json()}")
@@ -263,11 +279,13 @@ def cancel_orders(order_id):
 	response = requests.delete(url, headers = HEADERS)
 
 
+
+baseIncrement, quoteIncrement, priceIncrement = get_symbols() # testing
+
+
 def main():
 	funds = account_info()
 	print(funds)
-
-	# moved alot of variables to config
 
 	initial_order_buy_amount = funds * config.base_order_percent # only called once through market order
 
@@ -276,7 +294,7 @@ def main():
 	initial_safety_buy_amount = funds * config.saftey_order_percent
 
 
-	time.sleep(1)  # ************************ new ********************
+	time.sleep(1)  
 
 	dca_orders, tp_orders, order_amount, order_cost = dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount)  # - main for now
 
@@ -398,8 +416,7 @@ def main():
 
 
 
-
-
 if __name__ == "__main__":
 	main()
+
 
