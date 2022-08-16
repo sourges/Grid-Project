@@ -1,8 +1,6 @@
 # testing code for DCA bot
 
-# - baseIncrement + quoteIncrement + priceIncrement - updated
-# - clean up comments
-# - current bug - if market order buys into 2 or 3 orders (partial fills), TP is only placed with just one of those orders and not the full amount - currently testing fix
+# add safty_order_vol_scale
 
 import config
 import json
@@ -23,7 +21,7 @@ def dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount):
 	order_Id = place_market_order(initial_order_buy_amount)
 	order_id = order_Id['orderId']
 	
-	time.sleep(2)  # had issues before with 1 sec, seen no issues with updated code, might want to try back to 1 sec
+	time.sleep(1)  # had issues before with 1 sec, seen no issues with updated code, might want to try back to 1 sec
 
 
 	initial_price, initial_fee, order_quantity = test_fills(order_id)  # returns from market price
@@ -139,12 +137,11 @@ def test_fills(order_id):
 	price = response.json()['data']['items'][0]['price']
 	initial_fee = response.json()['data']['items'][0]['fee']
 	
-	#order_quantity = response.json()['data']['items'][0]['size']
-	totalNum = 0
-	for i in range(response.json()['data']['totalNum']):   # if market order fill by way of more than 1 order ( 2+ orders ) - testing for now
-		print(totalNum)
-		totalNum += float(response.json()['data']['items'][i]['size'])
-	return float(price), float(initial_fee), totalNum
+	order_quantity = 0
+	for i in range(response.json()['data']['totalNum']):   # if market order fill by way of more than 1 order ( 2+ orders ) - working 
+		print(order_quantity)
+		order_quantity += float(response.json()['data']['items'][i]['size'])
+	return float(price), float(initial_fee), order_quantity
 
 
 # - working
@@ -199,8 +196,7 @@ def place_market_order(initial_order_buy_amount):
 	
 	test = response.json()['data']
 	print(f"test = {test}")
-	
-	return test # order id
+	return test
 
 
 # - working
@@ -248,7 +244,7 @@ def cancel_orders(order_id):
 
 
 
-baseIncrement, quoteIncrement, priceIncrement = get_symbols() # testing
+baseIncrement, quoteIncrement, priceIncrement = get_symbols()
 
 
 def main():
@@ -264,7 +260,7 @@ def main():
 
 	time.sleep(1)  
 
-	dca_orders, tp_orders, order_amount, order_cost = dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount)  # - main for now
+	dca_orders, tp_orders, order_amount, order_cost = dca_bot(initial_safety_buy_amount, funds, initial_order_buy_amount)
 
 	# for testing purpose
 	count = 1 
@@ -340,7 +336,7 @@ def main():
 
 				time.sleep(1) 
 
-				cancel_orders(tp_orders[0]['orderId'])  #  need to test this when DCA is hit - probably need tp_orders[0]['orderId'] - currently works
+				cancel_orders(tp_orders[0]['orderId'])
 
 				print("cancelling TP order")
 				del tp_orders[0]
